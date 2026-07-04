@@ -9,9 +9,16 @@
 // The srflx IP comes from the sniffer (window.OmeTVIPGrabber). The IP is detected during ICE, a beat
 // before ome.tv renders this line, so it's normally ready when the line appears; we also handle the
 // reverse order by remembering the line until the IP arrives.
+//
+// Right after the IP we show a "City, Region, Country · ISP" summary resolved from geo.js, so the
+// whole picture sits inline in the connect line with nothing to hover or open.
+
+import { lookup } from './geo.js';
 
 const STYLE_ID = 'ometv-ip-style';
 const INJECT = 'ometv-ip-inject';
+const SEP = 'ometv-ip-sep';
+const SUMMARY = 'ometv-ip-summary';
 const ACCENT = '#f8834f'; // ome.tv orange
 
 function injectStyle() {
@@ -20,8 +27,10 @@ function injectStyle() {
   s.id = STYLE_ID;
   s.textContent = `
     .${INJECT}{font-family:ui-monospace,Consolas,monospace;font-weight:700;color:${ACCENT};cursor:pointer;}
-    .${INJECT}::before{content:"·";margin:0 6px;opacity:.4;font-weight:400;color:inherit;}
     .${INJECT}:hover{text-decoration:underline;}
+    .${SEP}{margin:0 6px;opacity:.4;}
+    .${SUMMARY}{font-size:.85em;opacity:.7;margin-left:6px;}
+    .${SUMMARY}::before{content:"·";margin-right:6px;opacity:.5;}
   `;
   document.head.appendChild(s);
 }
@@ -32,6 +41,13 @@ let pendingLine = null; // a country line rendered but still waiting for its IP
 function place(container, ip) {
   if (!container || container.__ometvIp) return;
   container.__ometvIp = ip;
+
+  // A neutral separator dot, kept outside the IP span so it isn't orange and doesn't underline/copy
+  // when you hover the IP.
+  const sep = document.createElement('span');
+  sep.className = SEP;
+  sep.textContent = '·';
+
   const span = document.createElement('span');
   span.className = INJECT;
   span.textContent = ip;
@@ -45,9 +61,23 @@ function place(container, ip) {
     span.textContent = 'copied!';
     setTimeout(() => (span.textContent = t), 700);
   });
+
+  const summary = document.createElement('span');
+  summary.className = SUMMARY;
+
+  const frag = document.createDocumentFragment();
+  frag.append(sep, span, summary);
+
   const country = container.querySelector('.tr-country');
-  if (country) country.after(span);
-  else container.appendChild(span);
+  if (country) country.after(frag);
+  else container.appendChild(frag);
+
+  // Resolve geo asynchronously; the bare IP is already visible, so this only enriches it.
+  lookup(ip).then((data) => {
+    if (!data) return;
+    const location = [data.city, data.region, data.country].filter(Boolean).join(', ');
+    summary.textContent = [location, data.isp].filter(Boolean).join(' · ');
+  });
 }
 
 // A country line just rendered (we trigger on the country-name span, so the flag sibling is already
@@ -76,14 +106,17 @@ function onIP(ip) {
 }
 
 // ome.tv reuses one persistent system bubble: on match it appends the flag + country into it, and on
-// disconnect it removes them again. Our injected IP isn't ome.tv's, so it would linger between
-// strangers, so we drop it the moment its bubble no longer has a `.tr-country`, and reset the bubble
+// disconnect it removes them again. Our injected nodes aren't ome.tv's, so they'd linger between
+// strangers, so we drop them the moment the bubble no longer has a `.tr-country`, and reset the bubble
 // so the next match re-injects cleanly.
 function cleanup() {
   for (const span of document.querySelectorAll('.' + INJECT)) {
     const bubble = span.closest('.message-bubble');
     if (!bubble || !bubble.querySelector('.tr-country')) {
-      if (bubble) delete bubble.__ometvIp;
+      if (bubble) {
+        delete bubble.__ometvIp;
+        bubble.querySelectorAll('.' + SEP + ', .' + SUMMARY).forEach((el) => el.remove());
+      }
       span.remove();
     }
   }

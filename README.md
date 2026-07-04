@@ -4,8 +4,8 @@ A userscript that shows you the IP address of the stranger you're matched with o
 [ome.tv](https://ome.tv). The IP appears right in the chat, next to the country flag ome.tv already
 shows on its "Connection established." line, and you can click it to copy.
 
-No setup and nothing to open: the IP comes from the connection your browser already makes, so there are
-no extra lookups or pop-ups.
+Right after the IP it also shows a short **City, Region, Country · ISP** summary, so you get the peer's
+location and network inline without hovering or opening anything.
 
 ## Install
 
@@ -70,8 +70,15 @@ is just the TURN server. Every detected IP is also logged to the console.
 name (`i.flag.message-flag` next to `span.tr-country`). The IP is placed right after the country name, so
 the IP and country are guaranteed to belong to the same peer, since they're the same message. ome.tv
 reuses one system bubble and strips that line when the stranger leaves, so the script removes its injected
-IP at that same moment and re-injects cleanly for the next match. Nothing is fetched, and there's no
-per-IP geolocation call: the country/flag are ome.tv's own.
+IP at that same moment and re-injects cleanly for the next match. The country/flag next to it are ome.tv's
+own — no lookup needed for those.
+
+**Enriching it** (`src/geo.js`). The bare IP shows instantly; in parallel the script resolves it to a
+location and network so the chat never waits on the network. Lookup goes to [ipwho.is](https://ipwho.is)
+— HTTPS, CORS-enabled, and keyless, so it works with the userscript's `grant: none` and no config. Each
+IP is looked up once and cached for the page's lifetime, so repeat candidates and re-matches don't re-hit
+the API. When the result lands, the inline **City, Region, Country · ISP** summary fills in right after
+the IP; if the call fails (offline, rate-limited), you simply keep the plain IP.
 
 The sniffer also exposes `window.OmeTVIPGrabber` (`onIP` / `getLast` / `getHistory`) and an `ometv-ip`
 event, if you want to build on top of it.
