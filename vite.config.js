@@ -22,6 +22,7 @@ export default defineConfig({
         description:
           "See the IP addresses of strangers on ome.tv.",
         author: 'sobakintech',
+        license: 'MIT',
         match: ['*://ome.tv/*', '*://*.ome.tv/*'],
         'run-at': 'document-start',
         grant: 'none',

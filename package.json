@@ -1,5 +1,6 @@
 {
   "name": "ometv-ip-grabber",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "scripts": {
